@@ -1,0 +1,7 @@
+# sam
+.aws-sam/
+samconfig.toml
+.aws/
+credentials
+node_modules/
+.next/
