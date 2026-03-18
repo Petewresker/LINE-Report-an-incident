@@ -4,4 +4,5 @@ samconfig.toml
 .aws/
 credentials
 node_modules/
-.next/
+.next/export PATH=$PATH:"/c/Program Files/Amazon/AWSSAMCLI/bin"
+.env
