@@ -1,0 +1,29 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Incident Reporting System Infrastructure - Manual Created
+
+Resources:
+  IncidentTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: IncidentReports_Group3
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: AgencyAccessToken
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: GSI1_AgencyPortal
+          KeySchema:
+            - AttributeName: AgencyAccessToken
+              KeyType: HASH
+            - AttributeName: PK
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
