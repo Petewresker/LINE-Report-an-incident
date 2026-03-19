@@ -1,11 +1,19 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: Incident Reporting System Infrastructure - Manual Created
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  LINE Report-an-incident: Backend with AI Analysis and SNS Notification.
 
 Resources:
+  # 1. S3 Bucket
+  IncidentImageBucket:
+    Type: AWS::S3::Bucket
+
+  # 2. DynamoDB Table (อัปเดตให้มี SK และ GSI ตาม table.json)
   IncidentTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: IncidentReports_Group3
+      TableName: !Sub "IncidentReports-${AWS::StackName}"
+      BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: PK
           AttributeType: S
@@ -27,3 +35,46 @@ Resources:
               KeyType: RANGE
           Projection:
             ProjectionType: ALL
+
+  # 3. SNS Topic
+  AgencyNotificationTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub "AgencyNotification-${AWS::StackName}"
+
+  # 4. Lambda Function
+  IncidentProcessorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: server/
+      Handler: src/app.handler 
+      Runtime: nodejs18.x
+      MemorySize: 512
+      Timeout: 30
+      Role: !Sub "arn:aws:iam::${AWS::AccountId}:role/LabRole"
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref IncidentTable
+          BUCKET_NAME: !Ref IncidentImageBucket
+          SNS_TOPIC_ARN: !Ref AgencyNotificationTopic
+          REGION: !Ref AWS::Region
+
+      Events:
+        PostIncident:
+          Type: Api
+          Properties:
+            Path: /report
+            Method: post
+        UpdateStatus:
+          Type: Api
+          Properties:
+            Path: /agency/update
+            Method: patch
+
+Outputs:
+  ApiUrl:
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"
+  SnsTopicArn:
+    Value: !Ref AgencyNotificationTopic
+  TableName:
+    Value: !Ref IncidentTable
