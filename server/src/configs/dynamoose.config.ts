@@ -1,8 +1,22 @@
-import dynamoose from "dynamoose"
-import dotenv from "dotenv"
+import dynamoose from 'dynamoose';
 
-dotenv.config()
-
-export const connectDynamoDB = () => {
-  dynamoose.aws.ddb.local(process.env.DYNAMODB_ENDPOINT!)
-}
+export const connectDynamoDB = async () => {
+  try {
+    // ถ้าเป็น production ใช้ AWS DynamoDB
+    if (process.env.NODE_ENV === 'production') {
+      dynamoose.aws.ddb.set(
+        new dynamoose.aws.ddb.DynamoDB({
+          region: process.env.REGION || 'us-east-1',
+        })
+      );
+    } else {
+      // Local development
+      dynamoose.aws.ddb.local('http://localhost:8000');
+    }
+    
+    console.log('DynamoDB connected successfully');
+  } catch (error) {
+    console.error('DynamoDB connection failed:', error);
+    throw error;
+  }
+};

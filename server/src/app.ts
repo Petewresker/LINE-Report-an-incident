@@ -7,8 +7,7 @@ import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import caseRoutes from './routes/case.route';
 
-// Routes
-import testRoute from './routes/test.route';
+
 
 // Middlewares
 const app: Application = express();
@@ -21,7 +20,7 @@ app.use(helmet());
 app.use(cookieParser());
 app.use('/api/cases', caseRoutes);
 
-app.use('/api/test', testRoute);
+
 
 app.get('/api', (req: Request, res: Response) => {
   return res.json({ message: 'API Available' });

@@ -1,32 +1,23 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: >
-  LINE Report-an-incident: Backend system with AI Analysis, 
-  Geolocation tracking, and Agency Forwarding Token.
+  LINE Report-an-incident: Backend with AI Analysis, SNS, and optimized deployment size.
 
 Resources:
-  # 1. ถังเก็บรูปภาพ (S3) - รองรับรูปจาก LINE LIFF
+  # 1. S3 Bucket สำหรับเก็บรูปภาพ
   IncidentImageBucket:
     Type: AWS::S3::Bucket
-    Properties:
-      BucketName: !Sub "line-incident-images-${AWS::AccountId}"
-      PublicAccessBlockConfiguration:
-        BlockPublicAcls: false
-        IgnorePublicAcls: false
-        BlockPublicPolicy: false
-        RestrictPublicBuckets: false
 
-  # 2. ฐานข้อมูล DynamoDB - ออกแบบตาม DB Diagram ของคุณ
-  # เก็บข้อมูล: ID, Title, Desc, Geo, Labels (จาก Rekog), Status, และ Token
+  # 2. DynamoDB Table (อิงตาม GSI ใน GitHub ของคุณ)
   IncidentTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: IncidentReports_Group3
+      TableName: !Sub "IncidentReports-${AWS::StackName}"
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
-        - AttributeName: PK # Primary Key (USER#userId)
+        - AttributeName: PK
           AttributeType: S
-        - AttributeName: SK # Sort Key (CASE#timestamp)
+        - AttributeName: SK
           AttributeType: S
         - AttributeName: AgencyAccessToken
           AttributeType: S
@@ -45,84 +36,59 @@ Resources:
           Projection:
             ProjectionType: ALL
 
-  # 3. ตัวประมวลผลหลัก (Backend Logic)
+  # 3. SNS Topic สำหรับแจ้งเตือนหน่วยงาน
+  AgencyNotificationTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub "AgencyNotification-${AWS::StackName}"
+
+  # 4. Lambda Function (ใช้ esbuild เพื่อแก้ปัญหาพื้นที่เกิน)
   IncidentProcessorFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: client/
-      Handler: app.handler
+      CodeUri: server/
+      # ปรับ Handler ให้ตรงกับไฟล์ใน GitHub (src/app.ts จะถูก build เป็น app.js)
+      Handler: lambda.handler
       Runtime: nodejs18.x
       MemorySize: 512
       Timeout: 30
-      Role: arn:aws:iam::292394385580:role/LabRole
+      Role: !Sub "arn:aws:iam::${AWS::AccountId}:role/LabRole"
       Environment:
         Variables:
           TABLE_NAME: !Ref IncidentTable
           BUCKET_NAME: !Ref IncidentImageBucket
-      
-      Metadata:
-        BuildMethod: esbuild
-        BuildProperties:
-          Minify: true
-          Target: "es2020"
-          Sourcemap: false
-          EntryPoints: 
-            - app.ts
+          SNS_TOPIC_ARN: !Ref AgencyNotificationTopic
+          REGION: !Ref AWS::Region
 
       Events:
-        # 1. API สำหรับ LINE LIFF (ส่งรูป + ข้อมูล)
-        PostIncident:
+        ApiProxy:
           Type: Api
           Properties:
-            Path: /report
-            Method: post
+            Path: /{proxy+}
+            Method: ANY
+        ApiRoot:
+          Type: Api
+          Properties:
+            Path: /
+            Method: ANY
 
-        # 2. API สำหรับ Dashboard Admin (วิเคราะห์แนวโน้ม/รวมเคส)
-        GetIncidents:
-          Type: Api
-          Properties:
-            Path: /admin/incidents
-            Method: get
-
-        # 3. API สำหรับหน่วยงานรับงาน (เรียกใช้ผ่าน URL ที่มี Token)
-        UpdateStatus:
-          Type: Api
-          Properties:
-            Path: /agency/update
-            Method: patch
-
-  # 4. Lambda Function สำหรับ Get User Cases
-  GetUserCasesFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: server/dist/
-      Handler: lambda/getUserCases.handler
-      Runtime: nodejs18.x
-      MemorySize: 512
-      Timeout: 30
-      Role: arn:aws:iam::292394385580:role/LabRole
-      Environment:
-        Variables:
-          TABLE_NAME: !Ref IncidentTable
-          NODE_ENV: production
-      
-      Events:
-        # API Gateway Endpoint
-        GetUserCases:
-          Type: Api
-          Properties:
-            Path: /cases/user/{userId}
-            Method: get
+    # --- ส่วนสำคัญ: ใช้ esbuild เพื่อบีบอัดไฟล์ให้เล็กลง ---
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: "es2020"
+        # ชี้ไปที่ไฟล์เริ่มต้นในโฟลเดอร์ server/src/
+        EntryPoints: 
+          - src/lambda.ts
+        External:
+          - "@aws-sdk/*" 
+          - "aws-sdk" 
 
 Outputs:
   ApiUrl:
-    Description: "Base URL สำหรับเรียกใช้งาน API ทั้งหมด"
     Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"
-
-  S3BucketName:
-    Description: "ชื่อถังเก็บรูปภาพสำหรับ Config ใน LINE LIFF"
-    Value: !Ref IncidentImageBucket
-  
-  GetUserCasesApiUrl:
-    Description: "API URL สำหรับ Get User Cases"
-    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/cases/user/{userId}"
+  SnsTopicArn:
+    Value: !Ref AgencyNotificationTopic
+  TableName:
+    Value: !Ref IncidentTable
