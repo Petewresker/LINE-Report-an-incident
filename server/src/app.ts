@@ -5,6 +5,7 @@ import compression from 'compression';
 import morgan from 'morgan';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
+import caseRoutes from './routes/case.route';
 
 // Routes
 import testRoute from './routes/test.route';
@@ -18,6 +19,7 @@ app.use(compression());
 app.use(morgan('dev'));
 app.use(helmet());
 app.use(cookieParser());
+app.use('/api/cases', caseRoutes);
 
 app.use('/api/test', testRoute);
 
