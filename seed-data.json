@@ -1,0 +1,46 @@
+{
+  "IncidentReports_Group3": [
+    {
+      "PutRequest": {
+        "Item": {
+          "PK": { "S": "USER#U1234567890abcdef" },
+          "SK": { "S": "CASE#2024-03-20T10:30:00" },
+          "caseId": { "S": "CASE-001" },
+          "userId": { "S": "U1234567890abcdef" },
+          "description": { "S": "ไฟฟ้าดับหน้าบ้าน" },
+          "location": { "S": "บ้านเลขที่ 123 ถนนสุขุมวิท" },
+          "status": { "S": "pending" },
+          "createdAt": { "S": "2024-03-20T10:30:00" }
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "PK": { "S": "USER#U1234567890abcdef" },
+          "SK": { "S": "CASE#2024-03-21T14:20:00" },
+          "caseId": { "S": "CASE-002" },
+          "userId": { "S": "U1234567890abcdef" },
+          "description": { "S": "ถนนเป็นหลุมใหญ่" },
+          "location": { "S": "ถนนพระราม 4" },
+          "status": { "S": "in-progress" },
+          "createdAt": { "S": "2024-03-21T14:20:00" }
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "PK": { "S": "USER#U1234567890abcdef" },
+          "SK": { "S": "CASE#2024-03-19T08:15:00" },
+          "caseId": { "S": "CASE-003" },
+          "userId": { "S": "U1234567890abcdef" },
+          "description": { "S": "ขยะไม่มีคนเก็บมา 3 วัน" },
+          "location": { "S": "ซอยสุขุมวิท 23" },
+          "status": { "S": "resolved" },
+          "createdAt": { "S": "2024-03-19T08:15:00" }
+        }
+      }
+    }
+  ]
+}

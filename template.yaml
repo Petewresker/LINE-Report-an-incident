@@ -1,15 +1,32 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: Incident Reporting System Infrastructure - Manual Created
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  LINE Report-an-incident: Backend system with AI Analysis, 
+  Geolocation tracking, and Agency Forwarding Token.
 
 Resources:
+  # 1. ถังเก็บรูปภาพ (S3) - รองรับรูปจาก LINE LIFF
+  IncidentImageBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "line-incident-images-${AWS::AccountId}"
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        IgnorePublicAcls: false
+        BlockPublicPolicy: false
+        RestrictPublicBuckets: false
+
+  # 2. ฐานข้อมูล DynamoDB - ออกแบบตาม DB Diagram ของคุณ
+  # เก็บข้อมูล: ID, Title, Desc, Geo, Labels (จาก Rekog), Status, และ Token
   IncidentTable:
     Type: AWS::DynamoDB::Table
     Properties:
       TableName: IncidentReports_Group3
+      BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
-        - AttributeName: PK
+        - AttributeName: PK # Primary Key (USER#userId)
           AttributeType: S
-        - AttributeName: SK
+        - AttributeName: SK # Sort Key (CASE#timestamp)
           AttributeType: S
         - AttributeName: AgencyAccessToken
           AttributeType: S
@@ -27,3 +44,85 @@ Resources:
               KeyType: RANGE
           Projection:
             ProjectionType: ALL
+
+  # 3. ตัวประมวลผลหลัก (Backend Logic)
+  IncidentProcessorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: client/
+      Handler: app.handler
+      Runtime: nodejs18.x
+      MemorySize: 512
+      Timeout: 30
+      Role: arn:aws:iam::292394385580:role/LabRole
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref IncidentTable
+          BUCKET_NAME: !Ref IncidentImageBucket
+      
+      Metadata:
+        BuildMethod: esbuild
+        BuildProperties:
+          Minify: true
+          Target: "es2020"
+          Sourcemap: false
+          EntryPoints: 
+            - app.ts
+
+      Events:
+        # 1. API สำหรับ LINE LIFF (ส่งรูป + ข้อมูล)
+        PostIncident:
+          Type: Api
+          Properties:
+            Path: /report
+            Method: post
+
+        # 2. API สำหรับ Dashboard Admin (วิเคราะห์แนวโน้ม/รวมเคส)
+        GetIncidents:
+          Type: Api
+          Properties:
+            Path: /admin/incidents
+            Method: get
+
+        # 3. API สำหรับหน่วยงานรับงาน (เรียกใช้ผ่าน URL ที่มี Token)
+        UpdateStatus:
+          Type: Api
+          Properties:
+            Path: /agency/update
+            Method: patch
+
+  # 4. Lambda Function สำหรับ Get User Cases
+  GetUserCasesFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: server/dist/
+      Handler: lambda/getUserCases.handler
+      Runtime: nodejs18.x
+      MemorySize: 512
+      Timeout: 30
+      Role: arn:aws:iam::292394385580:role/LabRole
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref IncidentTable
+          NODE_ENV: production
+      
+      Events:
+        # API Gateway Endpoint
+        GetUserCases:
+          Type: Api
+          Properties:
+            Path: /cases/user/{userId}
+            Method: get
+
+Outputs:
+  ApiUrl:
+    Description: "Base URL สำหรับเรียกใช้งาน API ทั้งหมด"
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"
+
+  S3BucketName:
+    Description: "ชื่อถังเก็บรูปภาพสำหรับ Config ใน LINE LIFF"
+    Value: !Ref IncidentImageBucket
+  
+  GetUserCasesApiUrl:
+    Description: "API URL สำหรับ Get User Cases"
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/cases/user/{userId}"
